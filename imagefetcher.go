@@ -31,6 +31,7 @@ type Image struct {
 	imagetype string
 	url       string
 	filename  string
+	fetched   bool
 }
 
 // New Fetcher
@@ -38,30 +39,36 @@ func New(url string) (*Fetcher, error) {
 	urlSclice := make([]string, 1)
 	urlSclice[0] = url
 	body := make([]Image, 1)
+	body[0].url = url
+	body[0].fetched = false
 	fetcher := &Fetcher{
 		urls:   urlSclice,
 		images: body,
 	}
-	err := fetcher.fetch(0)
-	if err != nil {
-		return nil, err
-	}
+	// err := fetcher.fetch(0)
+	// if err != nil {
+	// 	return nil, err
+	// }
 	return fetcher, nil
 }
 
 // NewSlice accepts slice of urls
 func NewSlice(urls []string, sem int) (*Fetcher, error) {
 	body := make([]Image, len(urls))
+	for i := range body {
+		body[i].url = urls[i]
+		body[i].fetched = false
+	}
 	fetcher := &Fetcher{
 		urls:   urls,
 		images: body,
 		sem:    sem,
 	}
 
-	err := fetcher.fetchAll(sem)
-	if err != nil {
-		return nil, err
-	}
+	// err := fetcher.fetchAll(sem)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	return fetcher, nil
 }
@@ -117,6 +124,34 @@ func (f *Fetcher) fetch(urlIndex int) error {
 	baseFilename := strings.TrimSuffix(filename, filepath.Ext(filename))
 
 	f.images[urlIndex].filename = baseFilename
+	f.images[urlIndex].fetched = true
+
+	return nil
+}
+
+// Fetch Fetch IMAGE data
+func (I *Image) fetch() error {
+	url := I.url
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return err
+	}
+
+	I.data = body
+	I.imagetype = http.DetectContentType(body)
+	I.url = url
+
+	filename := filepath.Base(url)
+	baseFilename := strings.TrimSuffix(filename, filepath.Ext(filename))
+
+	I.filename = baseFilename
+	I.fetched = true
 
 	return nil
 }
@@ -128,32 +163,83 @@ func (f *Fetcher) SavePng(path string) error {
 
 // SaveAllImagesToDisk saves all images to Disk
 func (f *Fetcher) SaveAllImagesToDisk(path string) error {
-	for _, image := range f.images {
-		filename := filepath.Base(image.url)
-		err := image.SaveImageToFile(path)
-		if err != nil {
-			fmt.Println("Saving error: ", filename)
-		} else {
-			fmt.Println("Saving DONE: ", filename)
-		}
+	sem := make(chan struct{}, int(math.Min(float64(f.sem), float64(len(f.images)))))
+
+	wg := &sync.WaitGroup{}
+	wg.Add(len(f.images))
+	done := func() {
+		wg.Done()
+		<-sem
 	}
+	for _, image := range f.images {
+		sem <- struct{}{}
+		go func(imagez Image) {
+			filename := filepath.Base(imagez.url)
+			err := imagez.fetch()
+			fmt.Println(imagez.url)
+			if err != nil {
+				fmt.Println("FETCH error: ", filename)
+			} else {
+				fmt.Println("FETCH DONE: ", filename)
+			}
+			err = imagez.SaveImageToFile(path)
+			if err != nil {
+				fmt.Println("Saving error: ", filename)
+			} else {
+				fmt.Println("Saving DONE: ", filename)
+			}
+			defer done()
+		}(image)
+	}
+	wg.Wait()
 	return nil
 }
 
 // SaveAllImagesToDiskInFormat saves all images to Disk in specified format
 func (f *Fetcher) SaveAllImagesToDiskInFormat(path string, format string) error {
-	for _, image := range f.images {
-		err := image.SaveImageToFileInFormat(path, format)
-		if err != nil {
-			fmt.Println(err)
-		}
+	sem := make(chan struct{}, int(math.Min(float64(f.sem), float64(len(f.images)))))
+
+	wg := &sync.WaitGroup{}
+	wg.Add(len(f.images))
+	done := func() {
+		wg.Done()
+		<-sem
 	}
+	for _, image := range f.images {
+		sem <- struct{}{}
+		go func(imagez Image) {
+			filename := filepath.Base(imagez.url)
+			err := imagez.fetch()
+			fmt.Println(imagez.url)
+			if err != nil {
+				fmt.Println("FETCH error: ", filename)
+			} else {
+				fmt.Println("FETCH DONE: ", filename)
+			}
+			err = imagez.SaveImageToFileInFormat(path, format)
+			if err != nil {
+				fmt.Println("Saving error: ", filename)
+			} else {
+				fmt.Println("Saving DONE: ", filename)
+			}
+			defer done()
+		}(image)
+	}
+	wg.Wait()
 	return nil
 }
 
 // SaveImageToFile saves fetched image to file
 func (I *Image) SaveImageToFile(saveDir string) error {
 	// filename := filepath.Base(I.url)
+	filename := filepath.Base(I.url)
+	if !I.fetched {
+		err := I.fetch()
+		if err != nil {
+			fmt.Println("FETCH error: ", filename)
+			return err
+		}
+	}
 
 	switch I.imagetype {
 	case "image/png":
@@ -167,14 +253,18 @@ func (I *Image) SaveImageToFile(saveDir string) error {
 	default:
 		return fmt.Errorf("Image format not supported")
 	}
-
-	return nil
 }
 
 // SaveImageToFileInFormat saves fetched image to file in specified format
 func (I *Image) SaveImageToFileInFormat(saveDir string, format string) error {
-	// filename := filepath.Base(I.url)
-
+	filename := filepath.Base(I.url)
+	if !I.fetched {
+		err := I.fetch()
+		if err != nil {
+			fmt.Println("FETCH error: ", filename)
+			return err
+		}
+	}
 	switch format {
 	case "png":
 		return I.saveImgToPNG(saveDir)
@@ -187,8 +277,6 @@ func (I *Image) SaveImageToFileInFormat(saveDir string, format string) error {
 	default:
 		return fmt.Errorf("Image format not supported")
 	}
-
-	return nil
 }
 
 // GetAllImages return all images
@@ -294,6 +382,11 @@ func (I *Image) saveImgToBitmap(path string) error {
 		return err
 	}
 	return bmp.Encode(f, img)
+}
+
+// GetURL returns image url
+func (I *Image) GetURL() string {
+	return I.url
 }
 
 func decodeImage(data []byte, format string) (image.Image, error) {
