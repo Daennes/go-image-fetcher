@@ -161,9 +161,9 @@ func (I *Image) SaveImageToFile(saveDir string) error {
 	case "image/jpeg":
 		return I.saveImgToJPEG(saveDir)
 	case "image/gif":
-		I.saveImgToGIF(saveDir)
+		return I.saveImgToGIF(saveDir)
 	case "image/bmp":
-		I.saveImgToBitmap(saveDir)
+		return I.saveImgToBitmap(saveDir)
 	default:
 		return fmt.Errorf("Image format not supported")
 	}
@@ -181,9 +181,9 @@ func (I *Image) SaveImageToFileInFormat(saveDir string, format string) error {
 	case "jpeg":
 		return I.saveImgToJPEG(saveDir)
 	case "gif":
-		I.saveImgToGIF(saveDir)
+		return I.saveImgToGIF(saveDir)
 	case "bmp":
-		I.saveImgToBitmap(saveDir)
+		return I.saveImgToBitmap(saveDir)
 	default:
 		return fmt.Errorf("Image format not supported")
 	}
@@ -223,34 +223,11 @@ func (I *Image) saveImgToPNG(path string) error {
 		os.MkdirAll(path, 0777)
 	}
 
-	var img image.Image
-
-	switch I.imagetype {
-	case "image/png":
-		var err error
-		img, err = decodePNG(I.data)
-		if err != nil || img == nil {
-			return err
-		}
-	case "image/jpeg":
-		var err error
-		img, err = decodeJPEG(I.data)
-		if err != nil || img == nil {
-			return err
-		}
-	case "image/gif":
-		var err error
-		img, err = decodeGIF(I.data)
-		if err != nil || img == nil {
-			return err
-		}
-	case "image/bmp":
-		var err error
-		img, err = decodeBMP(I.data)
-		if err != nil || img == nil {
-			return err
-		}
+	img, err := decodeImage(I.data, I.imagetype)
+	if err != nil {
+		return err
 	}
+
 	f, err := os.OpenFile(strings.Join(fullOutputPath, ""), os.O_WRONLY|os.O_CREATE, 0777)
 	if err != nil {
 
@@ -258,7 +235,6 @@ func (I *Image) saveImgToPNG(path string) error {
 	}
 
 	return png.Encode(f, img)
-
 }
 
 func (I *Image) saveImgToJPEG(path string) error {
@@ -268,8 +244,7 @@ func (I *Image) saveImgToJPEG(path string) error {
 		os.MkdirAll(path, 0777)
 	}
 
-	r := bytes.NewReader(I.data)
-	im, err := png.Decode(r)
+	img, err := decodeImage(I.data, I.imagetype)
 	if err != nil {
 		return err
 	}
@@ -279,15 +254,65 @@ func (I *Image) saveImgToJPEG(path string) error {
 		return err
 	}
 
-	return jpeg.Encode(f, im, nil)
+	return jpeg.Encode(f, img, nil)
 }
 
-func (I *Image) saveImgToGIF(path string) {
-	fmt.Println("Not implemented yet")
+func (I *Image) saveImgToGIF(path string) error {
+	fullOutputPath := []string{path, "/", I.filename, ".gif"}
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		os.MkdirAll(path, 0777)
+	}
+
+	img, err := decodeImage(I.data, I.imagetype)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(strings.Join(fullOutputPath, ""), os.O_WRONLY|os.O_CREATE, 0777)
+	if err != nil {
+		return err
+	}
+
+	return gif.Encode(f, img, nil)
 }
 
-func (I *Image) saveImgToBitmap(path string) {
-	fmt.Println("Not implemented yet")
+func (I *Image) saveImgToBitmap(path string) error {
+	fullOutputPath := []string{path, "/", I.filename, ".bmp"}
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		os.MkdirAll(path, 0777)
+	}
+
+	img, err := decodeImage(I.data, I.imagetype)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.OpenFile(strings.Join(fullOutputPath, ""), os.O_WRONLY|os.O_CREATE, 0777)
+	if err != nil {
+		return err
+	}
+	return bmp.Encode(f, img)
+}
+
+func decodeImage(data []byte, format string) (image.Image, error) {
+	format = strings.ToLower(format)
+	switch format {
+	case "image/png", "png":
+		return decodePNG(data)
+
+	case "image/jpeg", "jpeg", "jpg":
+		return decodeJPEG(data)
+
+	case "image/gif", "gif":
+		return decodeGIF(data)
+
+	case "image/bmp", "bmp", "bitmap":
+		return decodeBMP(data)
+	default:
+		return nil, fmt.Errorf("Format not supported")
+	}
 }
 
 func decodePNG(data []byte) (image.Image, error) {
