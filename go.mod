@@ -1,4 +1,4 @@
-module imagefetcher
+module github.com/Daennes/go-image-fetcher
 
 go 1.12
 
