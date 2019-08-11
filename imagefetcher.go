@@ -59,6 +59,7 @@ func NewSlice(urls []string, sem int) (*Fetcher, error) {
 		body[i].url = urls[i]
 		body[i].fetched = false
 	}
+	// fmt.Println("body", len(body))
 	fetcher := &Fetcher{
 		urls:   urls,
 		images: body,
@@ -361,7 +362,7 @@ func (I *Image) saveImgToGIF(path string) error {
 	if err != nil {
 		return err
 	}
-
+	defer f.Close()
 	return gif.Encode(f, img, nil)
 }
 
@@ -381,6 +382,7 @@ func (I *Image) saveImgToBitmap(path string) error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	return bmp.Encode(f, img)
 }
 
