@@ -319,7 +319,9 @@ func (I *Image) saveImgToPNG(path string, overwrite bool) error {
 
 	if !overwrite {
 		if _, err := os.Stat(strings.Join(fullOutputPath, "")); os.IsNotExist(err) {
-			return err
+
+		} else {
+			return fmt.Errorf("File alreadyexists")
 		}
 	}
 
