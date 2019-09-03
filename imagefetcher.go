@@ -163,7 +163,7 @@ func (f *Fetcher) SavePng(path string) error {
 }
 
 // SaveAllImagesToDisk saves all images to Disk
-func (f *Fetcher) SaveAllImagesToDisk(path string) error {
+func (f *Fetcher) SaveAllImagesToDisk(path string, overwrite bool) error {
 	sem := make(chan struct{}, int(math.Min(float64(f.sem), float64(len(f.images)))))
 
 	wg := &sync.WaitGroup{}
@@ -183,7 +183,7 @@ func (f *Fetcher) SaveAllImagesToDisk(path string) error {
 			} else {
 				fmt.Println("FETCH DONE: ", filename)
 			}
-			err = imagez.SaveImageToFile(path)
+			err = imagez.SaveImageToFile(path, overwrite)
 			if err != nil {
 				fmt.Println("Saving error: ", filename)
 			} else {
@@ -197,7 +197,7 @@ func (f *Fetcher) SaveAllImagesToDisk(path string) error {
 }
 
 // SaveAllImagesToDiskInFormat saves all images to Disk in specified format
-func (f *Fetcher) SaveAllImagesToDiskInFormat(path string, format string) error {
+func (f *Fetcher) SaveAllImagesToDiskInFormat(path string, format string, overwrite bool) error {
 	sem := make(chan struct{}, int(math.Min(float64(f.sem), float64(len(f.images)))))
 
 	wg := &sync.WaitGroup{}
@@ -217,7 +217,7 @@ func (f *Fetcher) SaveAllImagesToDiskInFormat(path string, format string) error 
 			} else {
 				fmt.Println("FETCH DONE: ", filename)
 			}
-			err = imagez.SaveImageToFileInFormat(path, format)
+			err = imagez.SaveImageToFileInFormat(path, format, overwrite)
 			if err != nil {
 				fmt.Println("Saving error: ", filename)
 			} else {
@@ -231,7 +231,7 @@ func (f *Fetcher) SaveAllImagesToDiskInFormat(path string, format string) error 
 }
 
 // SaveImageToFile saves fetched image to file
-func (I *Image) SaveImageToFile(saveDir string) error {
+func (I *Image) SaveImageToFile(saveDir string, overwrite bool) error {
 	// filename := filepath.Base(I.url)
 	filename := filepath.Base(I.url)
 	if !I.fetched {
@@ -244,7 +244,7 @@ func (I *Image) SaveImageToFile(saveDir string) error {
 
 	switch I.imagetype {
 	case "image/png":
-		return I.saveImgToPNG(saveDir)
+		return I.saveImgToPNG(saveDir, overwrite)
 	case "image/jpeg":
 		return I.saveImgToJPEG(saveDir)
 	case "image/gif":
@@ -257,7 +257,7 @@ func (I *Image) SaveImageToFile(saveDir string) error {
 }
 
 // SaveImageToFileInFormat saves fetched image to file in specified format
-func (I *Image) SaveImageToFileInFormat(saveDir string, format string) error {
+func (I *Image) SaveImageToFileInFormat(saveDir string, format string, overwrite bool) error {
 	filename := filepath.Base(I.url)
 	if !I.fetched {
 		err := I.fetch()
@@ -268,7 +268,7 @@ func (I *Image) SaveImageToFileInFormat(saveDir string, format string) error {
 	}
 	switch format {
 	case "png":
-		return I.saveImgToPNG(saveDir)
+		return I.saveImgToPNG(saveDir, overwrite)
 	case "jpeg":
 		return I.saveImgToJPEG(saveDir)
 	case "gif":
@@ -305,7 +305,7 @@ func (f *Fetcher) GetImagebyIndex(urlIndex int) (Image, error) {
 	return img, nil
 }
 
-func (I *Image) saveImgToPNG(path string) error {
+func (I *Image) saveImgToPNG(path string, overwrite bool) error {
 	fullOutputPath := []string{path, "/", I.filename, ".png"}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -317,9 +317,14 @@ func (I *Image) saveImgToPNG(path string) error {
 		return err
 	}
 
+	if !overwrite {
+		if _, err := os.Stat(strings.Join(fullOutputPath, "")); os.IsNotExist(err) {
+			return err
+		}
+	}
+
 	f, err := os.OpenFile(strings.Join(fullOutputPath, ""), os.O_WRONLY|os.O_CREATE, 0777)
 	if err != nil {
-
 		return err
 	}
 
