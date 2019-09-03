@@ -179,13 +179,13 @@ func (f *Fetcher) SaveAllImagesToDisk(path string, overwrite bool) error {
 			err := imagez.fetch()
 			fmt.Println(imagez.url)
 			if err != nil {
-				fmt.Println("FETCH error: ", filename)
+				fmt.Println("FETCH error: ", filename, err)
 			} else {
 				fmt.Println("FETCH DONE: ", filename)
 			}
 			err = imagez.SaveImageToFile(path, overwrite)
 			if err != nil {
-				fmt.Println("Saving error: ", filename)
+				fmt.Println("Saving error: ", filename, err)
 			} else {
 				fmt.Println("Saving DONE: ", filename)
 			}
@@ -213,13 +213,13 @@ func (f *Fetcher) SaveAllImagesToDiskInFormat(path string, format string, overwr
 			err := imagez.fetch()
 			fmt.Println(imagez.url)
 			if err != nil {
-				fmt.Println("FETCH error: ", filename)
+				fmt.Println("FETCH error: ", filename, err)
 			} else {
 				fmt.Println("FETCH DONE: ", filename)
 			}
 			err = imagez.SaveImageToFileInFormat(path, format, overwrite)
 			if err != nil {
-				fmt.Println("Saving error: ", filename)
+				fmt.Println("Saving error: ", filename, err)
 			} else {
 				fmt.Println("Saving DONE: ", filename)
 			}
