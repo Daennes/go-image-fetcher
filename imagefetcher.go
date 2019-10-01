@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,8 +106,8 @@ func (f *Fetcher) fetchAll(threadCount int) error {
 
 // Fetch Fetch data
 func (f *Fetcher) fetch(urlIndex int) error {
-	url := f.urls[urlIndex]
-	resp, err := http.Get(url)
+	urlStrin := f.urls[urlIndex]
+	resp, err := http.Get(urlStrin)
 	if err != nil {
 		return err
 	}
@@ -122,6 +123,8 @@ func (f *Fetcher) fetch(urlIndex int) error {
 	f.images[urlIndex].url = f.urls[urlIndex]
 
 	filename := filepath.Base(f.urls[urlIndex])
+	filenameUrl, _ := url.Parse(filename)
+	filename = filenameUrl.Path
 	baseFilename := strings.TrimSuffix(filename, filepath.Ext(filename))
 
 	f.images[urlIndex].filename = baseFilename
@@ -132,8 +135,8 @@ func (f *Fetcher) fetch(urlIndex int) error {
 
 // Fetch Fetch IMAGE data
 func (I *Image) fetch() error {
-	url := I.url
-	resp, err := http.Get(url)
+	urlStrin := I.url
+	resp, err := http.Get(urlStrin)
 	if err != nil {
 		return err
 	}
@@ -146,9 +149,11 @@ func (I *Image) fetch() error {
 
 	I.data = body
 	I.imagetype = http.DetectContentType(body)
-	I.url = url
+	I.url = urlStrin
 
-	filename := filepath.Base(url)
+	filename := filepath.Base(urlStrin)
+	filenameUrl, _ := url.Parse(filename)
+	filename = filenameUrl.Path
 	baseFilename := strings.TrimSuffix(filename, filepath.Ext(filename))
 
 	I.filename = baseFilename
@@ -176,6 +181,8 @@ func (f *Fetcher) SaveAllImagesToDisk(path string, overwrite bool) error {
 		sem <- struct{}{}
 		go func(imagez Image) {
 			filename := filepath.Base(imagez.url)
+			filenameUrl, _ := url.Parse(filename)
+			filename = filenameUrl.Path
 			err := imagez.fetch()
 			fmt.Println(imagez.url)
 			if err != nil {
@@ -210,6 +217,8 @@ func (f *Fetcher) SaveAllImagesToDiskInFormat(path string, format string, overwr
 		sem <- struct{}{}
 		go func(imagez Image) {
 			filename := filepath.Base(imagez.url)
+			filenameUrl, _ := url.Parse(filename)
+			filename = filenameUrl.Path
 			err := imagez.fetch()
 			fmt.Println(imagez.url)
 			if err != nil {
@@ -234,6 +243,8 @@ func (f *Fetcher) SaveAllImagesToDiskInFormat(path string, format string, overwr
 func (I *Image) SaveImageToFile(saveDir string, overwrite bool) error {
 	// filename := filepath.Base(I.url)
 	filename := filepath.Base(I.url)
+	filenameUrl, _ := url.Parse(filename)
+	filename = filenameUrl.Path
 	if !I.fetched {
 		err := I.fetch()
 		if err != nil {
@@ -259,6 +270,11 @@ func (I *Image) SaveImageToFile(saveDir string, overwrite bool) error {
 // SaveImageToFileInFormat saves fetched image to file in specified format
 func (I *Image) SaveImageToFileInFormat(saveDir string, format string, overwrite bool) error {
 	filename := filepath.Base(I.url)
+	filenameUrl, err := url.Parse(filename)
+	if err != nil {
+		return err
+	}
+	filename = filenameUrl.Path
 	if !I.fetched {
 		err := I.fetch()
 		if err != nil {
